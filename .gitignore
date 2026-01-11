@@ -5,3 +5,4 @@ env/
 .vscode/
 opencode.json
 AGENTS.md
+plans/*
