@@ -1,4 +1,7 @@
 __pycache__/
 model*/*
-env/*
+env/
 .DS_Store
+.vscode/
+opencode.json
+AGENTS.md
