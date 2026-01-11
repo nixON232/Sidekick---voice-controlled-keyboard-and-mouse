@@ -48,6 +48,8 @@ class CommandParser:
             "ten",
             "eleven",
         ]
+
+        self.table_zones = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
         self.numbers = [
             "pod",
             "pup",
@@ -113,6 +115,7 @@ class CommandParser:
             "release",
             "triple",
             "grid",
+            "table",
             "up",
             "down",
             "left",
@@ -130,6 +133,7 @@ class CommandParser:
         self.commandlist = (
             self.keys
             + self.grid_vertical
+            + self.table_zones
             + self.stateless_commands
             + self.commands
             + self.numbers
@@ -544,6 +548,21 @@ class CommandParser:
                             return self.handle_invalid_command(
                                 command_buffer[2], command_buffer
                             )
+                else:
+                    return self.handle_invalid_command(
+                        command_buffer[1], command_buffer
+                    )
+        elif command_buffer[0] == "table":
+            if len(command_buffer) >= 2:
+                if command_buffer[1] in self.table_zones:
+                    number = int(self.word_to_int(command_buffer[1]))
+                    row = (number - 1) % 3
+                    col = 2 - (number - 1) // 3
+                    x, y = screenSize()
+                    xpoint = (2 * row + 1) * x / 6
+                    ypoint = (2 * col + 1) * y / 6
+                    moveMouseAbs(xpoint, ypoint)
+                    command_buffer = ["table"]
                 else:
                     return self.handle_invalid_command(
                         command_buffer[1], command_buffer
