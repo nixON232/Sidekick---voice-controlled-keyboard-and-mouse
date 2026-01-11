@@ -84,14 +84,16 @@ alphavals = listToList(parser.alphavalues)
 DEBUG = False  # Set to True for debug output including command buffer
 
 model = Model("model")
-# the text recommender uses the standard model for transcription
 textrec = KaldiRecognizer(model, 16000)
-# use wordlist in our command recommender
 commandrec = KaldiRecognizer(model, 16000, commandwords)
 alpharec = KaldiRecognizer(model, 16000, alphavals)
 
+textrec.SetPartialWords(True)
+commandrec.SetPartialWords(True)
+alpharec.SetPartialWords(True)
+
 p = pyaudio.PyAudio()
-stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=8000)
+stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=800)
 stream.start_stream()
 
 print("\nSidekick at your service. Please wait silently for the threshold to be set based on ambient noise before use.")
@@ -104,7 +106,7 @@ wait = False # after threshold breached, need to process the next 5-10 audio sam
 waittime = 0 # when to toggle wait from True to False 
 while True:
     # read in audio data
-    data = stream.read(2000,exception_on_overflow = False)
+    data = stream.read(800,exception_on_overflow = False)
 
     # calculate decibels
     dB = 20 * math.log10(audioop.rms(data,2))
@@ -137,15 +139,28 @@ while True:
         if len(data) == 0:
             break
         if parser.state == "text":
-            if trec: # if this returns true model has determined best word candidate
-                ingest(parser.state,commandrec,textrec,alpharec) 
-            else: # if false only a partial result returned - not useful for this application
-                pass
-                #print(rec.PartialResult()) - partial result is faster, but not accurate enough for use
-            
+            if trec:
+                ingest(parser.state,commandrec,textrec,alpharec)
+            else:
+                partial_result = json.loads(textrec.PartialResult())
+                partial_text = partial_result.get("partial", "")
+                if partial_text:
+                    print(f"\r[Partial] {partial_text}", end="", flush=True)
+
         elif parser.state == "alpha":
-            if arec: # if this returns true model has determined best word candidate
-                ingest(parser.state,commandrec,textrec,alpharec)                 
+            if arec:
+                ingest(parser.state,commandrec,textrec,alpharec)
+            else:
+                partial_result = json.loads(alpharec.PartialResult())
+                partial_text = partial_result.get("partial", "")
+                if partial_text:
+                    print(f"\r[Partial] {partial_text}", end="", flush=True)
         else:
-            if crec: # if this returns true model has determined best word candidate
-                ingest(parser.state,commandrec,textrec,alpharec) 
+            if crec:
+                ingest(parser.state,commandrec,textrec,alpharec)
+            else:
+                partial_result = json.loads(commandrec.PartialResult())
+                partial_text = partial_result.get("partial", "")
+                if partial_text:
+                    print(f"\r[Partial] {partial_text}", end="", flush=True)
+
