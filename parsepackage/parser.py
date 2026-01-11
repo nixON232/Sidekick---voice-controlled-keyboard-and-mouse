@@ -29,6 +29,7 @@ class Parser:
         self.state = "command"
         self.command_buffer = []
         self.pause = False
+        self.DEBUG = False  # Set to True for debugging output
 
         self.stepmapping = {
             "one": 10,
@@ -77,7 +78,7 @@ class Parser:
 
         if len(self.command_buffer) > 0:
 
-            if not self.pause:
+            if self.DEBUG:
                 print(
                     self.command_buffer
                 )  # makes it easy to see current state of command_buffer

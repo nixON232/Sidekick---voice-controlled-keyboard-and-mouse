@@ -81,6 +81,8 @@ def ingest(currentstate,crec,trec,arec):
 commandwords = listToList(parser.nontextcommands)
 alphavals = listToList(parser.alphavalues)
 
+DEBUG = False  # Set to True for debug output including command buffer
+
 model = Model("model")
 # the text recommender uses the standard model for transcription
 textrec = KaldiRecognizer(model, 16000)
@@ -102,7 +104,7 @@ wait = False # after threshold breached, need to process the next 5-10 audio sam
 waittime = 0 # when to toggle wait from True to False 
 while True:
     # read in audio data
-    data = stream.read(4000,exception_on_overflow = False)
+    data = stream.read(2000,exception_on_overflow = False)
 
     # calculate decibels
     dB = 20 * math.log10(audioop.rms(data,2))
@@ -125,7 +127,7 @@ while True:
             waittime = 0
             wait = True
 
-        if waittime >= 8: # in my testing max wait time before word sent to parser was 6 - added a bit of buffer 
+        if waittime >= 5: # reduced from 8 for faster response 
             wait = False
 
         trec = textrec.AcceptWaveform(data)
