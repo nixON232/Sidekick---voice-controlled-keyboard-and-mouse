@@ -1,4 +1,4 @@
-'''
+"""
 Sidekick
 Copyright (C) 2021 UT-Battelle - Created by Sean Oesch
 
@@ -14,13 +14,16 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
-'''
-from actions import *
+"""
+
 import platform
+
+from actions import *
+
+from .alpha_parser import AlphaParser
+from .command_parser import CommandParser
 from .mouse_parser import MouseParser
 from .text_parser import TextParser
-from .command_parser import CommandParser
-from .alpha_parser import AlphaParser
 
 
 class Parser:
@@ -29,7 +32,7 @@ class Parser:
         self.state = "command"
         self.command_buffer = []
         self.pause = False
-        self.DEBUG = False  # Set to True for debugging output
+        self.DEBUG = True  # Set to True for debugging output
 
         self.stepmapping = {
             "one": 10,
@@ -77,7 +80,6 @@ class Parser:
                 self.command_buffer.append(word.lower())
 
         if len(self.command_buffer) > 0:
-
             if self.DEBUG:
                 print(
                     self.command_buffer
@@ -86,9 +88,7 @@ class Parser:
             self.evaluate()
 
     def evaluate(self):
-
         if self.pause:
-
             if self.command_buffer[0] == "time":
                 if len(self.command_buffer) >= 2:
                     if self.command_buffer[1] == "to":
@@ -147,7 +147,7 @@ class Parser:
                                 self.command_buffer,
                                 self.state,
                             ) = self.mouseParser.evaluate_mouse(self.command_buffer)
-            
+
         # stop mouse if state is switched before stopping
         if not self.mouseParser.stopMouse and self.state != "mouse":
             self.mouseParser.stopMouse = True

@@ -83,14 +83,35 @@ alphavals = listToList(parser.alphavalues)
 
 DEBUG = False  # Set to True for debug output including command buffer
 
-model = Model("model")
-textrec = KaldiRecognizer(model, 16000)
-commandrec = KaldiRecognizer(model, 16000, commandwords)
-alpharec = KaldiRecognizer(model, 16000, alphavals)
+def get_current_wordlist():
+    if parser.state == "text":
+        return []
+    elif parser.state == "command" or parser.state == "mouse":
+        return parser.nontextcommands
+    else:
+        return parser.alphavalues
 
-textrec.SetPartialWords(True)
-commandrec.SetPartialWords(True)
-alpharec.SetPartialWords(True)
+def get_adaptive_buffer_size():
+    if wait:
+        return 400
+    else:
+        return 800
+
+model = Model("model")
+current_words = None
+main_rec = None
+
+def get_main_recognizer():
+    global current_words, main_rec
+    words = get_current_wordlist()
+    if words != current_words or main_rec is None:
+        if main_rec is not None:
+            main_rec.Result()
+        wordlist_str = listToList(words) if words else "[]"
+        main_rec = KaldiRecognizer(model, 16000, wordlist_str)
+        main_rec.SetPartialWords(True)
+        current_words = words
+    return main_rec
 
 p = pyaudio.PyAudio()
 stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=800)
@@ -105,8 +126,8 @@ ambientvals = [] # Ambient noise level in dB is used to calculate appropriate th
 wait = False # after threshold breached, need to process the next 5-10 audio samples through the model even if they don't breach threshold 
 waittime = 0 # when to toggle wait from True to False 
 while True:
-    # read in audio data
-    data = stream.read(800,exception_on_overflow = False)
+    buffer_size = get_adaptive_buffer_size()
+    data = stream.read(buffer_size, exception_on_overflow=False)
 
     # calculate decibels
     dB = 20 * math.log10(audioop.rms(data,2))
@@ -129,38 +150,24 @@ while True:
             waittime = 0
             wait = True
 
-        if waittime >= 5: # reduced from 8 for faster response 
+        if waittime >= 5:
             wait = False
 
-        trec = textrec.AcceptWaveform(data)
-        crec = commandrec.AcceptWaveform(data)
-        arec = alpharec.AcceptWaveform(data)
+        rec = get_main_recognizer()
+        rec_result = rec.AcceptWaveform(data)
 
         if len(data) == 0:
             break
-        if parser.state == "text":
-            if trec:
-                ingest(parser.state,commandrec,textrec,alpharec)
-            else:
-                partial_result = json.loads(textrec.PartialResult())
-                partial_text = partial_result.get("partial", "")
-                if partial_text:
-                    print(f"\r[Partial] {partial_text}", end="", flush=True)
-
-        elif parser.state == "alpha":
-            if arec:
-                ingest(parser.state,commandrec,textrec,alpharec)
-            else:
-                partial_result = json.loads(alpharec.PartialResult())
-                partial_text = partial_result.get("partial", "")
-                if partial_text:
-                    print(f"\r[Partial] {partial_text}", end="", flush=True)
+        if rec_result:
+            res = json.loads(rec.Result())
+            if res["text"] != "":
+                for text in res["text"].split(" "):
+                    parser.ingest(text)
         else:
-            if crec:
-                ingest(parser.state,commandrec,textrec,alpharec)
-            else:
-                partial_result = json.loads(commandrec.PartialResult())
-                partial_text = partial_result.get("partial", "")
-                if partial_text:
-                    print(f"\r[Partial] {partial_text}", end="", flush=True)
+            partial_result = json.loads(rec.PartialResult())
+            partial_text = partial_result.get("partial", "")
+            if partial_text:
+                print(f"\r[Partial] {partial_text}", end="", flush=True)
+
+
 
