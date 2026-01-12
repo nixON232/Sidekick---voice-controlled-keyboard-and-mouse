@@ -1,6 +1,8 @@
 __pycache__/
 model*/*
 env/
+env-src/
+vosk-src/
 .DS_Store
 .vscode/
 opencode.json
