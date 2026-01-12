@@ -7,4 +7,4 @@ vosk-src/
 .vscode/
 opencode.json
 AGENTS.md
-plans/*
+docs/plans/*
