@@ -13,15 +13,18 @@ jobs:
 
       - name: Build with Docker (Dockcross)
         run: |
-          # Запуск официального скрипта сборки Vosk для Windows
-          # Он автоматически скачивает нужный образ и компилирует DLL
           cd travis
           chmod +x build-docker-win.sh
           ./build-docker-win.sh
+          # После сборки проверим, где лежит файл
+          echo "Поиск собранной DLL..."
+          find .. -name "*.dll"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: libvosk-win64
-          # Скрипт обычно помещает результат в папку src или dist
-          path: src/libvosk.dll
+          # Используем поиск по маске, чтобы не ошибиться с папкой
+          path: "**/*.dll"
+          if-no-files-found: error
+
