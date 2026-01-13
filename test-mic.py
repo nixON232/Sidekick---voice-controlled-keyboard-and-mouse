@@ -11,7 +11,6 @@ import sys
 import sounddevice as sd
 from vosk import KaldiRecognizer, Model, SetLogLevel
 
-SetLogLevel(1)
 q = queue.Queue()
 
 
@@ -94,7 +93,9 @@ try:
         print("#" * 80)
 
         rec = KaldiRecognizer(model, args.samplerate)
+        rec.SetWords(True)
 
+        SetLogLevel(1)
         while True:
             data = q.get()
             if rec.AcceptWaveform(data):
