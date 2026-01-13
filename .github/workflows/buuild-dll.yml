@@ -1,0 +1,45 @@
+name: Build libvosk.dll (Fast Docker)
+
+on:
+  push:
+    branches: [ make-dll]
+  workflow_dispatch:
+  release:
+    types: [ published ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Build Docker image
+        run: |
+          cd travis
+          docker build -f Dockerfile.win -t vosk-build-win .
+      
+      - name: Extract DLL from container
+        run: |
+          docker run --rm -v $(pwd):/output vosk-build-win \
+            bash -c "cp /opt/kaldi/vosk-api/src/libvosk.dll /output/"
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: libvosk-windows-x64
+          path: ./libvosk.dll
+      
+      - name: Create Release Asset
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./libvosk.dll
+          asset_name: libvosk-0.3.50-windows-x64.dll
+          asset_content_type: application/octet-stream
