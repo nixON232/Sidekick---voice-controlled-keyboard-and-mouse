@@ -2,7 +2,7 @@ name: Build libvosk.dll (Fast Docker)
 
 on:
   push:
-    branches: [ master ]
+    branches: [ make-dll]
   workflow_dispatch:
   release:
     types: [ published ]
