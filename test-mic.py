@@ -66,9 +66,13 @@ args = parser.parse_args(remaining)
 
 try:
     if args.samplerate is None:
-        device_info = sd.query_devices(args.device, "input")
+        if args.device is None:
+            device = sd.default.device["input"]  # type: ignore
+        else:
+            device = args.device
+        device_info = sd.query_devices(device, "input")
         # soundfile expects an int, sounddevice provides a float:
-        args.samplerate = int(device_info["default_samplerate"])
+        args.samplerate = int(device_info["default_samplerate"])  # type: ignore
 
     if args.model is None:
         model = Model(lang="en-us")
@@ -94,6 +98,7 @@ try:
 
         rec = KaldiRecognizer(model, args.samplerate)
         rec.SetWords(True)
+        # rec.SetEndpointerMode(EndpointerMode.SHORT)
 
         SetLogLevel(1)
         while True:
@@ -110,4 +115,4 @@ except KeyboardInterrupt:
     print("\nDone")
     parser.exit(0)
 except Exception as e:
-    parser.exit(type(e).__name__ + ": " + str(e))
+    parser.exit(1, type(e).__name__ + ": " + str(e))
