@@ -7,11 +7,13 @@
 import argparse
 import queue
 import sys
+import time
 
 import sounddevice as sd
 from vosk import KaldiRecognizer, Model, SetLogLevel
 
 q = queue.Queue()
+speech_start_time = None
 
 
 def int_or_str(text):
@@ -103,11 +105,21 @@ try:
         SetLogLevel(1)
         while True:
             data = q.get()
+            partial = rec.PartialResult()
+            if partial and speech_start_time is None:
+                try:
+                    partial_json = eval(partial) if partial.startswith("{") else {}
+                    if partial_json.get("partial"):
+                        speech_start_time = time.time()
+                except:
+                    pass
             if rec.AcceptWaveform(data):
-                print(rec.FinalResult())
-            else:
-                pass
-            # print(rec.PartialResult())
+                result = rec.FinalResult()
+                print(result)
+                if speech_start_time is not None:
+                    latency = time.time() - speech_start_time
+                    print(f"[Latency: {latency:.3f}s]")
+                    speech_start_time = None
             if dump_fn is not None:
                 dump_fn.write(data)
 
