@@ -74,7 +74,7 @@ try:
             device = args.device
         device_info = sd.query_devices(device, "input")
         # soundfile expects an int, sounddevice provides a float:
-        args.samplerate = int(device_info["default_samplerate"])  # type: ignore
+        args.samplerate = int(16000)  # type: ignore
 
     if args.model is None:
         model = Model(lang="en-us")
@@ -88,7 +88,7 @@ try:
 
     with sd.RawInputStream(
         samplerate=args.samplerate,
-        blocksize=8000,
+        blocksize=int(args.samplerate * 0.10),
         device=args.device,
         dtype="int16",
         channels=1,
@@ -97,6 +97,8 @@ try:
         print("#" * 80)
         print("Press Ctrl+C to stop the recording")
         print("#" * 80)
+        print("samplerate= ", args.samplerate)
+        print("blocksize=", args.samplerate * 0.10)
 
         rec = KaldiRecognizer(model, args.samplerate)
         rec.SetWords(True)
@@ -114,7 +116,7 @@ try:
                 except:
                     pass
             if rec.AcceptWaveform(data):
-                result = rec.FinalResult()
+                result = rec.Result()
                 print(result)
                 if speech_start_time is not None:
                     latency = time.time() - speech_start_time
