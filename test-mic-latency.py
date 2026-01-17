@@ -13,7 +13,6 @@ import sounddevice as sd
 from vosk import KaldiRecognizer, Model, SetLogLevel
 
 q = queue.Queue()
-speech_start_time = None
 
 
 def int_or_str(text):
@@ -73,8 +72,7 @@ try:
         else:
             device = args.device
         device_info = sd.query_devices(device, "input")
-        # soundfile expects an int, sounddevice provides a float:
-        args.samplerate = int(16000)  # type: ignore
+        args.samplerate = int(device_info["default_samplerate"])  # type: ignore
 
     if args.model is None:
         model = Model(lang="en-us")
@@ -88,7 +86,7 @@ try:
 
     with sd.RawInputStream(
         samplerate=args.samplerate,
-        blocksize=int(args.samplerate * 0.10),
+        blocksize=int(args.samplerate * 0.05),
         device=args.device,
         dtype="int16",
         channels=1,
@@ -97,8 +95,6 @@ try:
         print("#" * 80)
         print("Press Ctrl+C to stop the recording")
         print("#" * 80)
-        print("samplerate= ", args.samplerate)
-        print("blocksize=", args.samplerate * 0.10)
 
         rec = KaldiRecognizer(model, args.samplerate)
         # rec.SetWords(True)
@@ -107,21 +103,12 @@ try:
         SetLogLevel(1)
         while True:
             data = q.get()
-            partial = rec.PartialResult()
-            if partial and speech_start_time is None:
-                try:
-                    partial_json = eval(partial) if partial.startswith("{") else {}
-                    if partial_json.get("partial"):
-                        speech_start_time = time.time()
-                except:
-                    pass
+            start_time = time.time()
             if rec.AcceptWaveform(data):
                 result = rec.Result()
+                latency = time.time() - start_time
                 print(result)
-                if speech_start_time is not None:
-                    latency = time.time() - speech_start_time
-                    print(f"[Latency: {latency:.3f}s]")
-                    speech_start_time = None
+                print(f"[Process latency: {latency:.3f}s]")
             if dump_fn is not None:
                 dump_fn.write(data)
 

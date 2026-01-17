@@ -1,23 +1,25 @@
 #!/usr/bin/env python3
 
-# prerequisites: as described in https://alphacephei.com/vosk/install and also python module `sounddevice` (simply run command `pip install sounddevice`)
-# Example usage using Dutch (nl) recognition model: `python test_microphone.py -m nl`
-# For more help run: `python test_microphone.py -h`
-
 import argparse
 import queue
 import sys
 import time
+import json
+from datetime import datetime
 
 import sounddevice as sd
-from vosk import KaldiRecognizer, Model, SetLogLevel
+from vosk import KaldiRecognizer, Model, SetLogLevel, SpkModel
 
 q = queue.Queue()
-speech_start_time = None
+
+
+def log_word(word, latency):
+    timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+    print(f"[{timestamp}] WORD: {word} (latency: {latency:.3f}s)")
+    sys.stdout.flush()
 
 
 def int_or_str(text):
-    """Helper function for argument parsing."""
     try:
         return int(text)
     except ValueError:
@@ -25,7 +27,6 @@ def int_or_str(text):
 
 
 def callback(indata, frames, time, status):
-    """This is called (from a separate thread) for each audio block."""
     if status:
         print(status, file=sys.stderr)
     q.put(bytes(indata))
@@ -69,12 +70,11 @@ args = parser.parse_args(remaining)
 try:
     if args.samplerate is None:
         if args.device is None:
-            device = sd.default.device["input"]  # type: ignore
+            device = sd.default.device["input"]
         else:
             device = args.device
         device_info = sd.query_devices(device, "input")
-        # soundfile expects an int, sounddevice provides a float:
-        args.samplerate = int(16000)  # type: ignore
+        args.samplerate = int(device_info["default_samplerate"])
 
     if args.model is None:
         model = Model(lang="en-us")
@@ -86,42 +86,69 @@ try:
     else:
         dump_fn = None
 
+    blocksize = int(args.samplerate * 0.02)
+
     with sd.RawInputStream(
         samplerate=args.samplerate,
-        blocksize=int(args.samplerate * 0.10),
+        blocksize=blocksize,
         device=args.device,
         dtype="int16",
         channels=1,
         callback=callback,
     ):
         print("#" * 80)
-        print("Press Ctrl+C to stop the recording")
+        print("Real-time recognition - words appear as spoken")
+        print("Press Ctrl+C to stop")
         print("#" * 80)
-        print("samplerate= ", args.samplerate)
-        print("blocksize=", args.samplerate * 0.10)
 
         rec = KaldiRecognizer(model, args.samplerate)
-        # rec.SetWords(True)
-        # rec.SetEndpointerMode(EndpointerMode.SHORT)
 
-        SetLogLevel(1)
+        SetLogLevel(-1)
+        last_partial = ""
+        phrase_start_time = None
+        recognized_words = []
+
         while True:
             data = q.get()
+            start_time = time.time()
+
             partial = rec.PartialResult()
-            if partial and speech_start_time is None:
+            if partial:
                 try:
-                    partial_json = eval(partial) if partial.startswith("{") else {}
-                    if partial_json.get("partial"):
-                        speech_start_time = time.time()
+                    partial_json = json.loads(partial)
+                    text = partial_json.get("partial", "").strip()
+                    if text and text != last_partial:
+                        if phrase_start_time is None:
+                            phrase_start_time = start_time
+
+                        new_words = text.split()
+                        old_words = last_partial.split() if last_partial else []
+                        for i, word in enumerate(new_words):
+                            if i >= len(old_words) or word != old_words[i]:
+                                if word not in recognized_words:
+                                    word_latency = time.time() - phrase_start_time
+                                    print()
+                                    log_word(word, word_latency)
+                                    recognized_words.append(word)
+
+                        sys.stdout.write(f"\r[Partial] {text}" + " " * 40)
+                        sys.stdout.flush()
+                        last_partial = text
                 except:
                     pass
+
             if rec.AcceptWaveform(data):
                 result = rec.Result()
-                print(result)
-                if speech_start_time is not None:
-                    latency = time.time() - speech_start_time
-                    print(f"[Latency: {latency:.3f}s]")
-                    speech_start_time = None
+                result_json = json.loads(result)
+                text = result_json.get("text", "").strip()
+                if text:
+                    latency = time.time() - phrase_start_time if phrase_start_time else 0
+                    sys.stdout.write(f"\r[Final]   {text} (total latency: {latency:.2f}s)\n")
+                    sys.stdout.flush()
+                    phrase_start_time = None
+                    last_partial = ""
+                    recognized_words = []
+
             if dump_fn is not None:
                 dump_fn.write(data)
 
