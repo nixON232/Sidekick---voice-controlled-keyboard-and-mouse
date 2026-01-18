@@ -5,6 +5,7 @@ env-src/
 vosk-src/
 .DS_Store
 .vscode/
+logs/
 opencode.json
 AGENTS.md
 docs/plans/*
